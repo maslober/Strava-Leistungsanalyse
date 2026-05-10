@@ -1,0 +1,31 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+*.egg-info/
+.eggs/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Virtual environment
+.venv/
+venv/
+env/
+
+# Data artifacts
+*.csv
+*.parquet
+*.html
+*.png
+*.svg
+
+# OS / Editor
+.DS_Store
+Thumbs.db
+.vscode/*.code-workspace
