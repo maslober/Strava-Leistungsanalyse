@@ -41,6 +41,8 @@ SESSION_FIELDS = {
     "avg_temperature",
     "sport",
     "sub_sport",
+    "start_time",
+    "timestamp",
 }
 
 
@@ -48,10 +50,15 @@ def _safe_value(value: Any) -> Any:
     return value if value is not None else None
 
 
+def _open_fit_file(file_path: str | Path) -> FitFile:
+    file_path = Path(file_path)
+    return FitFile(str(file_path.resolve()))
+
+
 def load_fit_records(file_path: str | Path) -> pd.DataFrame:
     """Liest Record-Messages aus einer FIT-Datei und gibt ein DataFrame zurück."""
     file_path = Path(file_path)
-    fitfile = FitFile(str(Path(file_path).resolve()))
+    fitfile = _open_fit_file(file_path)
 
     rows: list[dict[str, Any]] = []
     for record in fitfile.get_messages("record"):
@@ -72,7 +79,7 @@ def load_fit_records(file_path: str | Path) -> pd.DataFrame:
         df["elapsed_seconds"] = (df["timestamp"] - df["timestamp"].iloc[0]).dt.total_seconds()
 
     if "distance" in df.columns:
-        df["distance_km"] = df["distance"] / 1000.0
+        df["distance_km"] = pd.to_numeric(df["distance"], errors="coerce") / 1000.0
 
     speed_source = None
     if "enhanced_speed" in df.columns:
@@ -81,7 +88,7 @@ def load_fit_records(file_path: str | Path) -> pd.DataFrame:
         speed_source = "speed"
 
     if speed_source is not None:
-        df["speed_m_s"] = df[speed_source]
+        df["speed_m_s"] = pd.to_numeric(df[speed_source], errors="coerce")
         df["speed_kmh"] = df["speed_m_s"] * 3.6
 
     altitude_source = None
@@ -91,17 +98,22 @@ def load_fit_records(file_path: str | Path) -> pd.DataFrame:
         altitude_source = "altitude"
 
     if altitude_source is not None:
-        df["altitude_m"] = df[altitude_source]
+        df["altitude_m"] = pd.to_numeric(df[altitude_source], errors="coerce")
 
+    for col in ["heart_rate", "power", "cadence", "temperature", "grade"]:
+        if col in df.columns:
+            df[col] = pd.to_numeric(df[col], errors="coerce")
+
+    df["source_file"] = file_path.name
     return df
 
 
 def load_fit_session_summary(file_path: str | Path) -> dict[str, Any]:
     """Liest Session-Metadaten aus einer FIT-Datei."""
     file_path = Path(file_path)
-    fitfile = FitFile(str(Path(file_path).resolve()))
+    fitfile = _open_fit_file(file_path)
 
-    summary: dict[str, Any] = {}
+    summary: dict[str, Any] = {"file_name": file_path.name}
     for session in fitfile.get_messages("session"):
         for field in session:
             if field.name in SESSION_FIELDS:
@@ -120,11 +132,27 @@ def load_fit_session_summary(file_path: str | Path) -> dict[str, Any]:
     return summary
 
 
-def find_first_fit_file(data_dir: str | Path = "data/raw") -> Path:
+def find_fit_files(data_dir: str | Path = "data/raw") -> list[Path]:
     data_dir = Path(data_dir)
     files = sorted(data_dir.glob("*.fit"))
     if not files:
         raise FileNotFoundError(
-            f"Keine .fit-Datei in '{data_dir}' gefunden. Bitte lege eine FIT-Datei in diesen Ordner."
+            f"Keine .fit-Datei in '{data_dir}' gefunden. Bitte lege mindestens eine FIT-Datei in diesen Ordner."
         )
-    return files[0]
+    return files
+
+
+def find_first_fit_file(data_dir: str | Path = "data/raw") -> Path:
+    return find_fit_files(data_dir)[0]
+
+
+def find_latest_fit_file(data_dir: str | Path = "data/raw") -> Path:
+    files = find_fit_files(data_dir)
+    return max(files, key=lambda p: p.stat().st_mtime)
+
+
+def load_multiple_fit_activities(data_dir: str | Path = "data/raw") -> dict[str, pd.DataFrame]:
+    activities: dict[str, pd.DataFrame] = {}
+    for fit_file in find_fit_files(data_dir):
+        activities[fit_file.name] = load_fit_records(fit_file)
+    return activities
