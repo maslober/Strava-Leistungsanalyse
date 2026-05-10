@@ -51,7 +51,7 @@ def _safe_value(value: Any) -> Any:
 def load_fit_records(file_path: str | Path) -> pd.DataFrame:
     """Liest Record-Messages aus einer FIT-Datei und gibt ein DataFrame zurück."""
     file_path = Path(file_path)
-    fitfile = FitFile(file_path)
+    fitfile = FitFile(str(Path(file_path).resolve()))
 
     rows: list[dict[str, Any]] = []
     for record in fitfile.get_messages("record"):
