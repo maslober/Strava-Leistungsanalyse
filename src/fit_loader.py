@@ -99,7 +99,7 @@ def load_fit_records(file_path: str | Path) -> pd.DataFrame:
 def load_fit_session_summary(file_path: str | Path) -> dict[str, Any]:
     """Liest Session-Metadaten aus einer FIT-Datei."""
     file_path = Path(file_path)
-    fitfile = FitFile(file_path)
+    fitfile = FitFile(str(Path(file_path).resolve()))
 
     summary: dict[str, Any] = {}
     for session in fitfile.get_messages("session"):
